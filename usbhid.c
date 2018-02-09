@@ -80,9 +80,9 @@ static const uint8_t hid_report_descriptor[] = {
 	0x81, 0x06, /*     INPUT (Data,Var,Rel)             */
 	0x06, 0x00, 0xff,              // USAGE_PAGE (Vendor Defined Page 1)
 	0x15, 0x00,                    // LOGICAL_MINIMUM (0)
-	0x25, 0x01,                    // LOGICAL_MAXIMUM (1)
-	0x95, 0x08,                    //   REPORT_COUNT (8)
-	0x75, 0x01,                    // REPORT_SIZE (1)
+	0x25, 0xFF,                    // LOGICAL_MAXIMUM (255)
+	0x95, 0x01,                    //   REPORT_COUNT (1)
+	0x75, 0x08,                    // REPORT_SIZE (8)
 	0x91, 0x02,                    // OUTPUT (Data,Var,Abs)
 	0xc0,       /*   END_COLLECTION                     */
 	0x09, 0x3c, /*   USAGE (Motion Wakeup)              */
@@ -117,24 +117,6 @@ static const struct {
 		.bReportDescriptorType = USB_DT_REPORT,
 		.wDescriptorLength = sizeof(hid_report_descriptor),
 	}
-};
-
-const struct usb_endpoint_descriptor hid_endpoint = {
-	.bLength = USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = 0x81,
-	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
-	.wMaxPacketSize = 4,
-	.bInterval = 0x20,
-};
-
-const struct usb_endpoint_descriptor hid_out_endpoint = {
-	.bLength = USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = 0x01,
-	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
-	.wMaxPacketSize = 1,
-	.bInterval = 0x20,
 };
 
 const struct usb_endpoint_descriptor allofem[2] = {
@@ -248,7 +230,7 @@ uint8_t usbd_control_buffer[128];
 
 /* This function gets called after data is transfered, so in this case, put the next set of data in */
 static void usbhid_data_rx_cb(usbd_device *dev, uint8_t ep) {
-	gpio_toggle(GPIOC,GPIO13);
+
 	int len = usbd_ep_write_packet(dev, ep, &myMouseReport, 4);
 	if(len == 4) {
 		//packet successful?
@@ -257,20 +239,26 @@ static void usbhid_data_rx_cb(usbd_device *dev, uint8_t ep) {
 	}
 }
 
+static void shiftout(uint8_t data) {
+	// GPIOB_12 SI, GPIOB13 CLK, GPIOB_14 Latch
+	gpio_clear(GPIOB,GPIO14); //make latch low
+	for(int i=8; i > -1; i--) {
+		gpio_clear(GPIOB,GPIO13); //clk low
+		if(data & (1 << i) ) { gpio_set(GPIOB,GPIO12); } else { gpio_clear(GPIOB,GPIO12);}
+		gpio_set(GPIOB,GPIO13); //clk high this shifts the Data
+	}
+	//Latch Data from Register to OUTPUT
+	gpio_set(GPIOB,GPIO14);
+
+}
+
 static void usbhid_data_tx_cb(usbd_device *dev, uint8_t ep) {
-	(void)ep;	//Not sure purpose of this
-
-
-
+	(void)ep;	//This is the endpoint address in this case its always 0x01
 	uint8_t leds;
 	int len = usbd_ep_read_packet(dev, 0x01, &leds, 1);
 
 	if(len) {
-		if(leds && 0x01) {
-			gpio_set(GPIOB,GPIO1);
-		} else {
-			gpio_clear(GPIOB,GPIO1);
-		}
+		shiftout(leds);
 	} else {
 		//Guess we didn't read a packet after all?
 	}
@@ -359,6 +347,8 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 	systick_counter_enable();
 }
 
+
+
 int main(void)
 {
 	rcc_clock_setup_in_hsi_out_48mhz();
@@ -379,8 +369,9 @@ int main(void)
 	 */
 
 	 // LED connected to GPIOB_1
-	 gpio_set_mode(GPIOB,GPIO_MODE_OUTPUT_2_MHZ,GPIO_CNF_OUTPUT_PUSHPULL,GPIO1);
-	 gpio_clear(GPIOB,GPIO1); //Clear LED status so we are in known state at reset
+	 gpio_set_mode(GPIOB,GPIO_MODE_OUTPUT_2_MHZ,GPIO_CNF_OUTPUT_PUSHPULL,GPIO0|GPIO12|GPIO13|GPIO14|GPIO15);
+	 gpio_set_mode(GPIOA,GPIO_MODE_OUTPUT_2_MHZ,GPIO_CNF_OUTPUT_PUSHPULL,GPIO8|GPIO9|GPIO10);
+
 
 	 //onboard led of Bluepill
 	 gpio_set_mode(GPIOC, GPIO_MODE_OUTPUT_2_MHZ,
@@ -412,9 +403,6 @@ void sys_tick_handler(void)
 		dir = -dir;
 	if (x < -30)
 		dir = -dir;
-
 	//update report structure
 	myMouseReport.x = x;
-
-
 }
