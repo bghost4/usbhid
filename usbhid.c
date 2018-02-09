@@ -135,7 +135,7 @@ const struct usb_endpoint_descriptor hid_out_endpoint = {
 	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
 	.wMaxPacketSize = 1,
 	.bInterval = 0x20,
-}
+};
 
 const struct usb_interface_descriptor hid_iface = {
 	.bLength = USB_DT_INTERFACE_SIZE,
@@ -226,6 +226,17 @@ uint8_t ledStates = 0;
 
 /* Buffer to be used for control requests. */
 uint8_t usbd_control_buffer[128];
+
+/* This function gets called after data is transfered, so in this case, put the next set of data in */
+static void usbhid_data_rx_cb(usbd_device *dev, uint8_t ep) {
+	gpio_toggle(GPIOC,GPIO13);
+	int len = usbd_ep_write_packet(dev, ep, &myMouseReport, 4);
+	if(len == 4) {
+		//packet successful?
+	} else {
+		//packet fail?
+	}
+}
 
 static void usbhid_data_tx_cb(usbd_device *dev, uint8_t ep) {
 	(void)ep;	//Not sure purpose of this
@@ -319,6 +330,7 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 				dfu_control_request);
 #endif
 
+	/* Have to put the packet in before it gets read */
 	usbhid_data_rx_cb(dev,0x81);
 
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
@@ -382,18 +394,8 @@ void sys_tick_handler(void)
 	if (x < -30)
 		dir = -dir;
 
+	//update report structure
 	myMouseReport.x = x;
-
-
-	int len = usbd_ep_write_packet(dev, 0x81, &myMouseReport, 4);
-	if(len == 1) {
-		//packet successful?
-	} else {
-		//packet fail?
-	}
-
-
-
 
 
 }
