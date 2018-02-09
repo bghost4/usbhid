@@ -137,6 +137,25 @@ const struct usb_endpoint_descriptor hid_out_endpoint = {
 	.bInterval = 0x20,
 };
 
+const struct usb_endpoint_descriptor allofem[2] = {
+		{
+			.bLength = USB_DT_ENDPOINT_SIZE,
+			.bDescriptorType = USB_DT_ENDPOINT,
+			.bEndpointAddress = 0x81,
+			.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+			.wMaxPacketSize = 4,
+			.bInterval = 0x20,
+		},
+		{
+			.bLength = USB_DT_ENDPOINT_SIZE,
+			.bDescriptorType = USB_DT_ENDPOINT,
+			.bEndpointAddress = 0x01,
+			.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+			.wMaxPacketSize = 1,
+			.bInterval = 0x20,
+		 }
+ };
+
 const struct usb_interface_descriptor hid_iface = {
 	.bLength = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType = USB_DT_INTERFACE,
@@ -148,7 +167,7 @@ const struct usb_interface_descriptor hid_iface = {
 	.bInterfaceProtocol = 2, /* mouse */
 	.iInterface = 0,
 
-	.endpoint = &hid_endpoint,
+	.endpoint = allofem,
 
 	.extra = &hid_function,
 	.extralen = sizeof(hid_function),
