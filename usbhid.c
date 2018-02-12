@@ -216,12 +216,13 @@ static const char *usb_strings[] = {
 
 
 typedef struct __attribute__((packed)) {
-	int8_t buttons,x,y,wheel;
+	uint8_t buttons;
+	int8_t x,y,wheel;
 } mouse_report;
 
 
 
-mouse_report myMouseReport;
+mouse_report myMouseReport = { .buttons = 0, .x = 0, .y = 0, .wheel = 0 };
 
 uint8_t ledStates = 0;
 
@@ -233,7 +234,7 @@ static void usbhid_data_rx_cb(usbd_device *dev, uint8_t ep) {
 
 	int len = usbd_ep_write_packet(dev, ep, &myMouseReport, 4);
 	if(len == 4) {
-		//packet successful?
+
 	} else {
 		//packet fail?
 	}
@@ -253,19 +254,18 @@ static void shiftout(uint8_t data) {
 }
 
 static void usbhid_data_tx_cb(usbd_device *dev, uint8_t ep) {
-	(void)ep;	//This is the endpoint address in this case its always 0x01
+	//ep This is the endpoint address in this case its always 0x01
 	uint8_t leds;
-	int len = usbd_ep_read_packet(dev, 0x01, &leds, 1);
+	if(ep == 0x01) {
+		int len = usbd_ep_read_packet(dev, 0x01, &leds, 1);
 
-	if(len) {
-		shiftout(leds);
-	} else {
-		//Guess we didn't read a packet after all?
+		if(len) {
+			shiftout(leds);
+		} else {
+			//Guess we didn't read a packet after all?
+		}
+
 	}
-
-gpio_toggle(GPIOC,GPIO13);
-
-
 }
 
 
@@ -323,6 +323,7 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue)
 
 	usbd_ep_setup(dev, 0x01, USB_ENDPOINT_ATTR_INTERRUPT, 1, usbhid_data_tx_cb);
 	usbd_ep_setup(dev, 0x81, USB_ENDPOINT_ATTR_INTERRUPT, 4, usbhid_data_rx_cb);
+	//usbd_ep_setup(dev, 0x81, USB_ENDPOINT_ATTR_INTERRUPT, 4, NULL);
 
 	usbd_register_control_callback(
 				dev,
@@ -396,6 +397,7 @@ void sys_tick_handler(void)
 	static int x = 0;
 	static int dir = 1;
 
+	//uint8_t buf[] = { 0,x,0,0};
 
 
 	x += dir;
@@ -404,5 +406,7 @@ void sys_tick_handler(void)
 	if (x < -30)
 		dir = -dir;
 	//update report structure
-	myMouseReport.x = x;
+	myMouseReport.x = dir;
+	//usbd_ep_write_packet(usbd_dev, 0x81,buf , 4);
+	gpio_toggle(GPIOC,GPIO13);
 }
